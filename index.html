@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doodlify — AI NFT Avatar Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --cream:#faf5ef;--cream2:#f0ebe3;
+  --ink:#2c2520;--ink2:#6b6058;--ink3:#9b9288;
+  --coral:#e8604c;--coral-lt:#fde8e4;
+  --mint:#5bb88a;--mint-lt:#e4f5ec;
+  --sky:#5b9de8;--sky-lt:#e4eef8;
+  --sun:#e8b44c;--sun-lt:#fdf4e4;
+  --violet:#9b6be8;--violet-lt:#f0e8fd;
+  --r-sm:8px;--r-md:14px;--r-lg:22px;--r-xl:32px;--r-full:9999px;
+  --font-d:'Outfit',system-ui,sans-serif;
+  --font-b:'DM Sans',system-ui,sans-serif;
+  --ease:cubic-bezier(.25,1,.5,1);
+}
+html{font-size:16px;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font-b);color:var(--ink);background:var(--cream);min-height:100vh;overflow-x:hidden}
+
+.app{display:flex;flex-direction:column;min-height:100vh}
+.header{display:flex;align-items:center;justify-content:space-between;padding:16px clamp(16px,4vw,40px);background:rgba(250,245,239,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(44,37,32,.06);position:sticky;top:0;z-index:100}
+.logo{font-family:var(--font-d);font-weight:800;font-size:clamp(1.3rem,2.5vw,1.7rem);letter-spacing:-.03em;display:flex;align-items:center;gap:8px}
+.logo-dot{width:26px;height:26px;border-radius:50%;background:var(--coral);position:relative;flex-shrink:0}
+.logo-dot::before,.logo-dot::after{content:'';position:absolute;width:6px;height:6px;border-radius:50%;background:var(--cream);top:8px}
+.logo-dot::before{left:5px}.logo-dot::after{right:5px}
+.hdr-btns{display:flex;gap:8px}
+.btn-o{font-family:var(--font-b);font-size:.85rem;font-weight:500;padding:7px 16px;border-radius:var(--r-full);cursor:pointer;transition:all .2s var(--ease);background:none;color:var(--ink2);border:1.5px solid rgba(44,37,32,.1)}
+.btn-o:hover{border-color:var(--ink);color:var(--ink)}
+.btn-f{font-family:var(--font-b);font-size:.85rem;font-weight:600;padding:8px 18px;border-radius:var(--r-full);cursor:pointer;transition:all .2s var(--ease);background:var(--ink);color:var(--cream);border:none}
+.btn-f:hover{opacity:.85}
+
+.main{flex:1;display:flex;flex-direction:column}
+.step{display:none;flex-direction:column;flex:1}
+.step.active{display:flex}
+
+.upload-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:clamp(20px,5vw,60px)}
+.upload-box{max-width:640px;width:100%;text-align:center}
+.upload-h{font-family:var(--font-d);font-size:clamp(2rem,5vw,3.4rem);font-weight:800;line-height:1.1;letter-spacing:-.04em;margin-bottom:14px}
+.upload-h em{font-style:normal;background:linear-gradient(135deg,var(--coral),var(--violet),var(--sky));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.upload-p{font-size:clamp(.95rem,1.4vw,1.1rem);color:var(--ink2);line-height:1.6;max-width:460px;margin:0 auto 36px}
+
+.drop{position:relative;border:2px dashed rgba(44,37,32,.14);border-radius:var(--r-xl);padding:clamp(40px,7vw,72px) 28px;cursor:pointer;transition:all .25s var(--ease);background:rgba(250,245,239,.5)}
+.drop:hover,.drop.over{border-color:var(--coral);background:var(--coral-lt);transform:scale(1.005)}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.drop-ico{width:56px;height:56px;margin:0 auto 16px;border-radius:var(--r-lg);background:var(--sun-lt);display:flex;align-items:center;justify-content:center;transition:transform .25s var(--ease)}
+.drop:hover .drop-ico{transform:translateY(-3px)}
+.drop-ico svg{width:24px;height:24px;stroke:var(--ink2);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.drop-t{font-family:var(--font-d);font-size:1rem;font-weight:600;margin-bottom:4px}
+.drop-s{font-size:.82rem;color:var(--ink3)}
+
+.pills{display:flex;justify-content:center;gap:10px;margin-top:28px;flex-wrap:wrap}
+.pill{display:flex;align-items:center;gap:6px;font-size:.76rem;font-weight:500;color:var(--ink2);padding:6px 12px;border-radius:var(--r-full);background:rgba(250,245,239,.7);border:1px solid rgba(44,37,32,.05)}
+.pill i{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+.studio{flex:1;display:grid;grid-template-columns:1fr 340px;min-height:0}
+@media(max-width:860px){.studio{grid-template-columns:1fr;grid-template-rows:1fr auto}}
+
+.preview{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:clamp(16px,3vw,40px);background:linear-gradient(135deg,rgba(232,96,76,.06),rgba(91,157,232,.06)),var(--cream2);gap:16px;min-height:400px}
+.preview-frame{width:100%;max-width:420px;border-radius:var(--r-xl);overflow:hidden;background:var(--cream);box-shadow:0 2px 4px rgba(44,37,32,.04),0 8px 24px rgba(44,37,32,.08)}
+.preview-frame canvas{max-width:100%;max-height:100%;display:block}
+
+.nft-card{display:flex;align-items:center;gap:14px;padding:12px 18px;background:#fff;border-radius:var(--r-lg);border:1px solid rgba(44,37,32,.06);max-width:420px;width:100%}
+.nft-card-item{flex:1}
+.nft-card-label{font-size:.65rem;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:1px}
+.nft-card-val{font-family:var(--font-d);font-weight:700;font-size:.85rem}
+.nft-card-div{width:1px;height:28px;background:rgba(44,37,32,.06);flex-shrink:0}
+.nft-tag{display:inline-block;font-size:.62rem;font-weight:600;padding:2px 8px;border-radius:var(--r-full);letter-spacing:.02em}
+
+.preview-bar{display:flex;align-items:center;gap:10px}
+.ibtn{width:40px;height:40px;border-radius:50%;border:1.5px solid rgba(44,37,32,.1);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s var(--ease);flex-shrink:0}
+.ibtn:hover{border-color:var(--ink);transform:scale(1.06)}
+.ibtn svg{width:16px;height:16px;stroke:var(--ink2);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.cmp-label{font-size:.72rem;color:var(--ink3);font-weight:500}
+.cmp-track{width:100px;height:5px;background:rgba(44,37,32,.08);border-radius:var(--r-full);cursor:pointer;position:relative}
+.cmp-fill{position:absolute;left:0;top:0;height:100%;width:100%;background:var(--coral);border-radius:var(--r-full);pointer-events:none}
+
+.ctrl{border-left:1px solid rgba(44,37,32,.06);background:#fff;display:flex;flex-direction:column;overflow-y:auto;max-height:calc(100vh - 56px)}
+@media(max-width:860px){.ctrl{border-left:none;border-top:1px solid rgba(44,37,32,.06);max-height:none}}
+.ctrl::-webkit-scrollbar{width:3px}
+.ctrl::-webkit-scrollbar-thumb{background:rgba(44,37,32,.1);border-radius:var(--r-full)}
+
+.sec{padding:20px 22px;border-bottom:1px solid rgba(44,37,32,.05)}
+.sec:last-child{border-bottom:none}
+.sec-t{font-family:var(--font-d);font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--ink3);margin-bottom:14px}
+
+.style-badge{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--r-lg);background:var(--cream);border:1.5px solid rgba(44,37,32,.08)}
+.style-badge-ico{width:40px;height:40px;border-radius:var(--r-md);background:linear-gradient(135deg,var(--coral),var(--violet));display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.style-badge-ico svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.style-badge-txt{flex:1}
+.style-badge-name{font-family:var(--font-d);font-weight:700;font-size:.9rem;margin-bottom:1px}
+.style-badge-desc{font-size:.72rem;color:var(--ink3);line-height:1.4}
+
+.pg{display:flex;gap:6px;flex-wrap:wrap}
+.pc{display:flex;gap:2px;padding:5px;border-radius:var(--r-md);border:2.5px solid transparent;cursor:pointer;transition:all .2s var(--ease);background:var(--cream2)}
+.pc:hover{transform:scale(1.04)}
+.pc.on{border-color:var(--ink)}
+.pc i{width:16px;height:22px;border-radius:3px;display:block}
+
+.sr{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.sr:last-child{margin-bottom:0}
+.sr label{font-size:.78rem;font-weight:500;color:var(--ink2);min-width:44px}
+.sr input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:5px;border-radius:var(--r-full);background:rgba(44,37,32,.08);outline:none}
+.sr input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--ink);cursor:pointer;border:2.5px solid #fff;box-shadow:0 1px 3px rgba(44,37,32,.2)}
+.sr output{font-size:.72rem;font-weight:600;color:var(--ink3);min-width:24px;text-align:right;font-variant-numeric:tabular-nums}
+
+.bg{display:flex;gap:6px;flex-wrap:wrap}
+.bo{width:38px;height:38px;border-radius:var(--r-md);cursor:pointer;border:2.5px solid transparent;transition:all .2s var(--ease)}
+.bo:hover{transform:scale(1.06)}
+.bo.on{border-color:var(--ink)}
+
+.acts{padding:20px 22px;margin-top:auto;display:flex;flex-direction:column;gap:8px}
+.btn-xl{font-family:var(--font-d);font-size:.95rem;font-weight:700;padding:14px 20px;border-radius:var(--r-lg);cursor:pointer;border:none;transition:all .2s var(--ease);text-align:center}
+.btn-xl.pri{background:var(--ink);color:var(--cream)}
+.btn-xl.pri:hover{opacity:.88;transform:translateY(-1px)}
+.btn-xl.sec{background:transparent;color:var(--ink);border:1.5px solid rgba(44,37,32,.1)}
+.btn-xl.sec:hover{border-color:var(--ink)}
+
+.ov{position:fixed;inset:0;z-index:200;background:rgba(250,245,239,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:28px}
+.ov.on{display:flex}
+.ov-img{max-width:clamp(180px,45vw,320px);border-radius:var(--r-xl);overflow:hidden;box-shadow:0 6px 32px rgba(44,37,32,.1)}
+.ov-img canvas{max-width:100%;height:auto;display:block}
+.ov-title{font-family:var(--font-d);font-size:clamp(1.1rem,2.2vw,1.5rem);font-weight:700;text-align:center}
+.ov-desc{font-size:.85rem;color:var(--ink2);text-align:center;margin-top:-16px}
+.pbar{width:clamp(180px,36vw,280px);height:5px;border-radius:var(--r-full);background:rgba(44,37,32,.08);overflow:hidden}
+.pbar-f{height:100%;width:0%;border-radius:var(--r-full);background:linear-gradient(90deg,var(--coral),var(--violet),var(--sky));background-size:200% 100%;animation:pshim 1.8s linear infinite;transition:width .3s var(--ease)}
+@keyframes pshim{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(70px);padding:12px 22px;border-radius:var(--r-full);background:var(--ink);color:var(--cream);font-size:.82rem;font-weight:500;z-index:300;transition:transform .35s cubic-bezier(.16,1,.3,1);pointer-events:none;white-space:nowrap}
+.toast.on{transform:translateX(-50%) translateY(0)}
+
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="logo"><span class="logo-dot"></span>Doodlify</div>
+    <div class="hdr-btns">
+      <button class="btn-o" onclick="showToast('作品集功能即将上线')">我的作品</button>
+      <button class="btn-f" onclick="showToast('钱包连接功能即将上线')">连接钱包</button>
+    </div>
+  </header>
+  <main class="main">
+    <section class="step active" id="s1">
+      <div class="upload-wrap">
+        <div class="upload-box">
+          <h1 class="upload-h">将你的照片变成<br><em>NFT 插画头像</em></h1>
+          <p class="upload-p">上传一张照片，AI 将把它转化为粗描边平涂风格的 NFT 插画头像</p>
+          <div class="drop" id="drop">
+            <div class="drop-ico"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+            <div class="drop-t">点击上传或拖拽照片到这里</div>
+            <div class="drop-s">支持 JPG、PNG，推荐清晰人像</div>
+            <input type="file" accept="image/*" id="fi">
+          </div>
+          <div class="pills">
+            <div class="pill"><i style="background:var(--coral)"></i>粗描边插画风</div>
+            <div class="pill"><i style="background:var(--mint)"></i>自定义配色</div>
+            <div class="pill"><i style="background:var(--sky)"></i>一键铸造</div>
+            <div class="pill"><i style="background:var(--sun)"></i>高清下载</div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="step" id="s2">
+      <div class="studio">
+        <div class="preview">
+          <div class="preview-frame"><canvas id="pv"></canvas></div>
+          <div class="nft-card">
+            <div class="nft-card-item"><div class="nft-card-label">Collection</div><div class="nft-card-val">Doodlify #<span id="nid">0000</span></div></div>
+            <div class="nft-card-div"></div>
+            <div class="nft-card-item"><div class="nft-card-label">风格</div><div class="nft-card-val" id="nsn">NFT 插画</div></div>
+            <div class="nft-card-div"></div>
+            <div class="nft-card-item"><div class="nft-card-label">稀有度</div><span class="nft-tag" id="nrt" style="background:var(--mint-lt);color:#2d6a4f">普通</span></div>
+          </div>
+          <div class="preview-bar">
+            <button class="ibtn" id="bbk" title="返回"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+            <span class="cmp-label">原图</span>
+            <div class="cmp-track" id="cmp"><div class="cmp-fill" id="cmpf"></div></div>
+            <span class="cmp-label">插画</span>
+            <button class="ibtn" id="brd" title="随机参数"><svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></button>
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="sec">
+            <div class="sec-t">艺术风格</div>
+            <div class="style-badge">
+              <div class="style-badge-ico"><svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></div>
+              <div class="style-badge-txt">
+                <div class="style-badge-name">NFT 插画风格</div>
+                <div class="style-badge-desc">粗黑描边 · 平涂色块 · 高饱和度 · 卡通化</div>
+              </div>
+            </div>
+          </div>
+          <div class="sec"><div class="sec-t">配色方案</div><div class="pg" id="pg"></div></div>
+          <div class="sec">
+            <div class="sec-t">参数调整</div>
+            <div class="sr"><label>线条</label><input type="range" min="0" max="100" value="65" id="re"><output id="ve">65</output></div>
+            <div class="sr"><label>色彩</label><input type="range" min="0" max="100" value="75" id="rc"><output id="vc">75</output></div>
+            <div class="sr"><label>细节</label><input type="range" min="0" max="100" value="45" id="rd"><output id="vd">45</output></div>
+          </div>
+          <div class="sec"><div class="sec-t">背景</div><div class="bg" id="bgg"></div></div>
+          <div class="acts">
+            <button class="btn-xl pri" id="bmint">铸造 NFT</button>
+            <button class="btn-xl sec" id="bdl">下载头像</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="ov" id="ov">
+  <div class="ov-img"><canvas id="ovc"></canvas></div>
+  <div class="ov-title" id="ovt">正在创作你的 NFT...</div>
+  <div class="ov-desc" id="ovd">AI 正在分析照片特征</div>
+  <div class="pbar"><div class="pbar-f" id="pbf"></div></div>
+</div>
+<div class="toast" id="tt"></div>
+
+<script>
+const S = {
+  img:null, imgData:null, styled:null,
+  pal:0, bg:0,
+  edge:65, color:75, detail:45, blend:1,
+  cacheKey:''
+};
+
+const PALS = [
+  ['#FF6B6B','#4ECDC4','#FFE66D','#A78BFA','#FF9F43'],
+  ['#FF006E','#8338EC','#3A86FF','#00F5D4','#FFBE0B'],
+  ['#F4845F','#F7B267','#F25C54','#7B2D8E','#3D5A80'],
+  ['#2D6A4F','#52B788','#95D5B2','#B7E4C7','#D8F3DC'],
+  ['#023E8A','#0077B6','#0096C7','#48CAE4','#CAF0F8'],
+  ['#E07A5F','#F2CC8F','#81B29A','#3D405B','#F4F1DE'],
+];
+const BGS = [
+  '#FAF5EF','#FFE8E8','#E8F5E9','#E3F2FD','#F3E5F5','#FFF8E1','#263238',
+  'linear-gradient(135deg,#FF6B6B,#4ECDC4)',
+  'linear-gradient(135deg,#A78BFA,#3B82F6)',
+  'linear-gradient(135deg,#F59E0B,#EF4444)',
+];
+const MSGS = [
+  ['正在创作你的 NFT...','AI 正在分析照片特征'],
+  ['提取面部轮廓中...','识别关键特征点'],
+  ['绘制描边线条...','生成粗黑轮廓'],
+  ['色彩平涂中...','填充饱和色块'],
+  ['精细打磨...','优化细节与质感'],
+  ['即将完成!','最后的润色'],
+];
+
+const $=s=>document.querySelector(s);
+const $$=s=>document.querySelectorAll(s);
+
+let _tt;
+function showToast(m){const t=$('#tt');t.textContent=m;t.classList.add('on');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('on'),2400)}
+
+function initDrop(){
+  const d=$('#drop'),f=$('#fi');
+  d.addEventListener('dragover',e=>{e.preventDefault();d.classList.add('over')});
+  d.addEventListener('dragleave',()=>d.classList.remove('over'));
+  d.addEventListener('drop',e=>{e.preventDefault();d.classList.remove('over');const file=e.dataTransfer.files[0];if(file)loadFile(file)});
+  f.addEventListener('change',e=>{if(e.target.files[0])loadFile(e.target.files[0])});
+}
+
+function loadFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement('canvas');
+      const max=256;
+      let w=img.width,h=img.height;
+      if(w>h){h=h*max/w;w=max}else{w=w*max/h;h=max}
+      w=Math.round(w);h=Math.round(h);
+      c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      onImageReady(c);
+    };
+    img.onerror=()=>showToast('图片加载失败');
+    img.src=e.target.result;
+  };
+  r.onerror=()=>showToast('文件读取失败');
+  r.readAsDataURL(file);
+}
+
+function onImageReady(canvas){
+  S.img=canvas;
+  const tc=document.createElement('canvas');
+  tc.width=canvas.width;tc.height=canvas.height;
+  const ctx=tc.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(canvas,0,0);
+  S.imgData=ctx.getImageData(0,0,tc.width,tc.height);
+  S.cacheKey='';
+  startProcessing();
+}
+
+function startProcessing(){
+  try{
+    const ov=$('#ov'),ovc=$('#ovc'),pbf=$('#pbf');
+    const ovCtx=ovc.getContext('2d');
+    ov.classList.add('on');
+    pbf.style.width='0%';
+    $('#ovt').textContent=MSGS[0][0];
+    $('#ovd').textContent=MSGS[0][1];
+    ovc.width=S.img.width;ovc.height=S.img.height;
+    ovCtx.drawImage(S.img,0,0);
+
+    const origC=document.createElement('canvas');
+    origC.width=S.img.width;origC.height=S.img.height;
+    origC.getContext('2d').putImageData(S.imgData,0,0);
+
+    const safetyTimer=setTimeout(()=>{
+      console.warn('Processing safety timeout triggered');
+      ov.classList.remove('on');
+      S.styled=origC;
+      openStudio();
+    },8000);
+
+    requestAnimationFrame(()=>{
+      pbf.style.width='8%';
+      setTimeout(()=>{
+        try{
+          const sd=transform(S.imgData);
+          const sc=document.createElement('canvas');
+          sc.width=S.imgData.width;sc.height=S.imgData.height;
+          sc.getContext('2d').putImageData(sd,0,0);
+          S.styled=sc;
+        }catch(err){
+          console.error('Transform error:',err);
+          S.styled=origC;
+        }
+
+        let mi=0;const dur=1800,start=performance.now();
+        (function tick(now){
+          const t=Math.min((now-start)/dur,1);
+          pbf.style.width=(8+(1-Math.pow(1-t,3))*92)+'%';
+          const ni=Math.min(Math.floor(t*MSGS.length),MSGS.length-1);
+          if(ni!==mi){mi=ni;$('#ovt').textContent=MSGS[mi][0];$('#ovd').textContent=MSGS[mi][1]}
+          ovCtx.clearRect(0,0,ovc.width,ovc.height);
+          ovCtx.drawImage(origC,0,0);
+          if(t>.1&&S.styled){ovCtx.globalAlpha=Math.min((t-.1)/.9,1);ovCtx.drawImage(S.styled,0,0);ovCtx.globalAlpha=1}
+          if(t<1)requestAnimationFrame(tick);
+          else{clearTimeout(safetyTimer);setTimeout(()=>{ov.classList.remove('on');openStudio()},250)}
+        })(performance.now());
+      },80);
+    });
+  }catch(err){
+    console.error('startProcessing error:',err);
+    $('#ov').classList.remove('on');
+    showToast('处理出错，请重试');
+  }
+}
+
+/* ── NFT Illustration Transform Engine ── */
+function hex2rgb(h){const v=parseInt(h.slice(1),16);return[(v>>16)&255,(v>>8)&255,v&255]}
+function rgb2hsl(r,g,b){r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b);let h,s,l=(mx+mn)/2;if(mx===mn)h=s=0;else{const d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);if(mx===r)h=((g-b)/d+(g<b?6:0))/6;else if(mx===g)h=((b-r)/d+2)/6;else h=((r-g)/d+4)/6}return[h,s,l]}
+function hsl2rgb(h,s,l){let r,g,b;if(s===0)r=g=b=l;else{const f=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<.5)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p};const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;r=f(p,q,h+1/3);g=f(p,q,h);b=f(p,q,h-1/3)}return[Math.round(r*255),Math.round(g*255),Math.round(b*255)]}
+function nearest(r,g,b,pal){let md=1e9,n=pal[0];for(const c of pal){const d=(r-c[0])**2+(g-c[1])**2+(b-c[2])**2;if(d<md){md=d;n=c}}return n}
+
+function transform(src){
+  const pal=PALS[S.pal].map(hex2rgb);
+  const w=src.width,h=src.height,n=w*h;
+  const s=src.data;
+  const edgeF=S.edge/100;
+  const colorF=S.color/100;
+  const detailF=S.detail/100;
+
+  /* Step 1: Separable box blur (horizontal then vertical) */
+  const bR=Math.max(1,Math.round(2-detailF*1.5));
+  const tmp=new Float32Array(n*3);
+  const sm=new Float32Array(n*3);
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      let sr=0,sg=0,sb=0,c=0;
+      const x0=Math.max(0,x-bR),x1=Math.min(w-1,x+bR);
+      for(let xi=x0;xi<=x1;xi++){const p=(y*w+xi)*4;sr+=s[p];sg+=s[p+1];sb+=s[p+2];c++}
+      const k=(y*w+x)*3;tmp[k]=sr/c;tmp[k+1]=sg/c;tmp[k+2]=sb/c;
+    }
+  }
+  for(let x=0;x<w;x++){
+    for(let y=0;y<h;y++){
+      let sr=0,sg=0,sb=0,c=0;
+      const y0=Math.max(0,y-bR),y1=Math.min(h-1,y+bR);
+      for(let yi=y0;yi<=y1;yi++){const k=(yi*w+x)*3;sr+=tmp[k];sg+=tmp[k+1];sb+=tmp[k+2];c++}
+      const k=(y*w+x)*3;sm[k]=sr/c;sm[k+1]=sg/c;sm[k+2]=sb/c;
+    }
+  }
+
+  /* Step 2: Sobel edge detection on original */
+  const gray=new Float32Array(n);
+  for(let i=0;i<n;i++){const j=i*4;gray[i]=.299*s[j]+.587*s[j+1]+.114*s[j+2]}
+  const edges=new Float32Array(n);
+  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+    const i=y*w+x;
+    const gx=-gray[i-w-1]+gray[i-w+1]-2*gray[i-1]+2*gray[i+1]-gray[i+w-1]+gray[i+w+1];
+    const gy=-gray[i-w-1]-2*gray[i-w]-gray[i-w+1]+gray[i+w-1]+2*gray[i+w]+gray[i+w+1];
+    edges[i]=Math.sqrt(gx*gx+gy*gy);
+  }
+
+  /* Step 3: Threshold + 1px dilation for thick outlines */
+  const thr=50+90*(1-edgeF);
+  const edgeMask=new Uint8Array(n);
+  for(let i=0;i<n;i++)if(edges[i]>thr)edgeMask[i]=1;
+  if(edgeF>.3){
+    const dilated=new Uint8Array(edgeMask);
+    for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+      const i=y*w+x;
+      if(!edgeMask[i]&&(edgeMask[i-1]||edgeMask[i+1]||edgeMask[i-w]||edgeMask[i+w]))dilated[i]=1;
+    }
+    for(let i=0;i<n;i++)edgeMask[i]=dilated[i];
+  }
+
+  /* Step 4: Color: saturate + posterize + palette */
+  const postL=Math.round(4+detailF*4);
+  const satB=1.3+colorF*1.2;
+  const pMix=.25+colorF*.35;
+  const out=new ImageData(w,h);
+  const d=out.data;
+
+  for(let i=0;i<n;i++){
+    const j=i*4;
+    if(edgeMask[i]){d[j]=26;d[j+1]=20;d[j+2]=16;d[j+3]=255;continue}
+    const k=i*3;
+    let r=sm[k],g=sm[k+1],b=sm[k+2];
+    let[hh,ss,ll]=rgb2hsl(r,g,b);
+    ss=Math.min(1,ss*satB);
+    ll=Math.max(.06,Math.min(.94,ll));
+    [r,g,b]=hsl2rgb(hh,ss,ll);
+    const step=256/postL;
+    r=Math.round(Math.round(r/step)*step);
+    g=Math.round(Math.round(g/step)*step);
+    b=Math.round(Math.round(b/step)*step);
+    if(pal.length){const c=nearest(r,g,b,pal);r=Math.round(r*(1-pMix)+c[0]*pMix);g=Math.round(g*(1-pMix)+c[1]*pMix);b=Math.round(b*(1-pMix)+c[2]*pMix)}
+    d[j]=r;d[j+1]=g;d[j+2]=b;d[j+3]=255;
+  }
+  return out;
+}
+
+/* ── Studio ── */
+function openStudio(){
+  $('#s1').classList.remove('active');
+  $('#s2').classList.add('active');
+  $('#nid').textContent=String(Math.floor(Math.random()*9999)).padStart(4,'0');
+  buildPals();buildBgs();updateInfo();render();
+}
+
+function rebuildStyled(){
+  try{
+    const sd=transform(S.imgData);
+    const c=document.createElement('canvas');
+    c.width=S.imgData.width;c.height=S.imgData.height;
+    c.getContext('2d').putImageData(sd,0,0);
+    S.styled=c;
+  }catch(e){console.error(e)}
+}
+
+function render(){
+  if(!S.imgData)return;
+  const key=[S.pal,S.edge,S.color,S.detail].join('|');
+  if(key!==S.cacheKey){S.cacheKey=key;rebuildStyled()}
+
+  const cv=$('#pv'),ctx=cv.getContext('2d');
+  const iw=S.imgData.width,ih=S.imgData.height;
+  cv.width=iw;cv.height=ih;
+
+  const bgv=BGS[S.bg];
+  if(bgv.startsWith('linear')){
+    const m=bgv.match(/#[0-9A-Fa-f]{6}/g);
+    if(m&&m.length>=2){const g=ctx.createLinearGradient(0,0,iw,ih);g.addColorStop(0,m[0]);g.addColorStop(1,m[1]);ctx.fillStyle=g}
+    else ctx.fillStyle='#FAF5EF';
+  }else ctx.fillStyle=bgv;
+  ctx.fillRect(0,0,iw,ih);
+
+  const oc=document.createElement('canvas');oc.width=iw;oc.height=ih;
+  oc.getContext('2d').putImageData(S.imgData,0,0);
+  ctx.drawImage(oc,0,0);
+
+  if(S.styled){ctx.globalAlpha=S.blend;ctx.drawImage(S.styled,0,0);ctx.globalAlpha=1}
+}
+
+function buildPals(){
+  const g=$('#pg');g.innerHTML='';
+  PALS.forEach((p,idx)=>{
+    const c=document.createElement('div');c.className='pc'+(idx===S.pal?' on':'');
+    p.forEach(cl=>{const i=document.createElement('i');i.style.background=cl;c.appendChild(i)});
+    c.onclick=()=>{S.pal=idx;$$('.pc').forEach(x=>x.classList.remove('on'));c.classList.add('on');render()};
+    g.appendChild(c);
+  });
+}
+
+function buildBgs(){
+  const g=$('#bgg');g.innerHTML='';
+  BGS.forEach((b,idx)=>{
+    const c=document.createElement('div');c.className='bo'+(idx===S.bg?' on':'');
+    c.style.background=b;
+    if(b==='#263238')c.style.border='2.5px solid rgba(44,37,32,.15)';
+    c.onclick=()=>{S.bg=idx;$$('.bo').forEach(x=>x.classList.remove('on'));c.classList.add('on');render()};
+    g.appendChild(c);
+  });
+}
+
+function updateInfo(){
+  $('#nsn').textContent='NFT 插画';
+  const tot=S.edge+S.color+S.detail;
+  const ri=tot>220?3:tot>170?2:tot>120?1:0;
+  const rn=['普通','稀有','史诗','传说'][ri];
+  const rc=[{bg:'var(--mint-lt)',c:'#2d6a4f'},{bg:'var(--sky-lt)',c:'#1e5a9e'},{bg:'var(--violet-lt)',c:'#5b2d9e'},{bg:'var(--coral-lt)',c:'#b03a2a'}][ri];
+  const t=$('#nrt');t.textContent=rn;t.style.background=rc.bg;t.style.color=rc.c;
+}
+
+function initSliders(){
+  [['re','ve','edge'],['rc','vc','color'],['rd','vd','detail']].forEach(([rid,vid,key])=>{
+    const inp=$('#'+rid),out=$('#'+vid);
+    let tm;
+    inp.oninput=()=>{S[key]=+inp.value;out.textContent=inp.value;updateInfo();clearTimeout(tm);tm=setTimeout(render,150)};
+  });
+}
+
+function initComparison(){
+  const tr=$('#cmp'),fl=$('#cmpf');let drag=false;
+  function upd(e){const r=tr.getBoundingClientRect();S.blend=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));fl.style.width=(S.blend*100)+'%';render()}
+  tr.onmousedown=e=>{drag=true;upd(e)};
+  document.onmousemove=e=>{if(drag)upd(e)};
+  document.onmouseup=()=>drag=false;
+  tr.ontouchstart=e=>{drag=true;upd(e.touches[0])};
+  document.ontouchmove=e=>{if(drag)upd(e.touches[0])};
+  document.ontouchend=()=>drag=false;
+}
+
+function initActions(){
+  $('#bbk').onclick=()=>{
+    $('#s2').classList.remove('active');$('#s1').classList.add('active');
+    S.img=S.imgData=S.styled=null;S.cacheKey='';$('#fi').value='';
+  };
+  $('#brd').onclick=()=>{
+    S.pal=Math.floor(Math.random()*PALS.length);
+    S.bg=Math.floor(Math.random()*BGS.length);
+    S.edge=30+Math.floor(Math.random()*70);
+    S.color=30+Math.floor(Math.random()*70);
+    S.detail=15+Math.floor(Math.random()*70);
+    $('#re').value=S.edge;$('#ve').textContent=S.edge;
+    $('#rc').value=S.color;$('#vc').textContent=S.color;
+    $('#rd').value=S.detail;$('#vd').textContent=S.detail;
+    buildPals();buildBgs();render();updateInfo();showToast('已随机生成新参数');
+  };
+  $('#bdl').onclick=()=>{
+    const a=document.createElement('a');a.download='doodlify-'+Date.now()+'.png';a.href=$('#pv').toDataURL('image/png');a.click();showToast('头像已保存');
+  };
+  $('#bmint').onclick=()=>showToast('钱包连接功能即将上线，敬请期待');
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  initDrop();initSliders();initComparison();initActions();
+});
+</script>
+</body>
+</html>

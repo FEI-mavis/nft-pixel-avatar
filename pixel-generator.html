@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixel Avatar Generator — 像素头像生成器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f2ed;--bg2:#eae6df;--bg3:#ddd8d0;
+  --fg:#1a1714;--fg2:#55504a;--fg3:#8a8580;
+  --accent:#d35233;--accent-soft:#f8e4df;
+  --card:#fff;--card-border:rgba(26,23,20,.07);
+  --r-sm:6px;--r-md:10px;--r-lg:16px;
+  --font:'Space Grotesk',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+html{font-size:16px;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font);color:var(--fg);background:var(--bg);min-height:100vh}
+
+.app{display:grid;grid-template-columns:300px 1fr;grid-template-rows:auto 1fr;min-height:100vh}
+@media(max-width:900px){.app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr}}
+
+.topbar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--card-border);background:var(--card)}
+.topbar-title{font-weight:700;font-size:1.1rem;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.topbar-title span{display:inline-block;width:8px;height:8px;background:var(--accent);border-radius:2px}
+.topbar-link{font-size:.82rem;color:var(--fg2);text-decoration:none;padding:6px 14px;border-radius:var(--r-sm);border:1px solid var(--card-border);transition:all .15s}
+.topbar-link:hover{border-color:var(--fg3);color:var(--fg)}
+
+.sidebar{background:var(--card);border-right:1px solid var(--card-border);padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:0}
+@media(max-width:900px){.sidebar{border-right:none;border-bottom:1px solid var(--card-border)}}
+
+.sec{padding:16px 0;border-bottom:1px solid var(--card-border)}
+.sec:first-child{padding-top:0}
+.sec:last-child{border-bottom:none}
+.sec-label{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--fg3);margin-bottom:10px}
+
+.color-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.color-row:last-child{margin-bottom:0}
+.color-row label{font-size:.82rem;color:var(--fg2);min-width:52px;font-weight:500}
+.color-input-wrap{display:flex;align-items:center;gap:8px;flex:1}
+.color-swatch{width:32px;height:32px;border-radius:var(--r-sm);border:2px solid var(--card-border);cursor:pointer;position:relative;overflow:hidden;flex-shrink:0}
+.color-swatch input[type=color]{position:absolute;inset:-6px;width:calc(100% + 12px);height:calc(100% + 12px);border:none;cursor:pointer;padding:0}
+.color-hex{font-family:var(--mono);font-size:.78rem;color:var(--fg2);background:var(--bg);border:1px solid var(--card-border);border-radius:var(--r-sm);padding:5px 8px;width:82px;text-transform:uppercase}
+
+.brand-colors{display:flex;flex-direction:column;gap:6px}
+.brand-chip{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-md);border:2px solid var(--card-border);cursor:pointer;transition:all .15s;background:var(--card)}
+.brand-chip:hover{border-color:var(--fg3)}
+.brand-chip.on{border-color:var(--fg);background:var(--bg)}
+.brand-chip .chip-dot{width:28px;height:28px;border-radius:var(--r-sm);flex-shrink:0}
+.brand-chip .chip-info{flex:1;display:flex;flex-direction:column}
+.brand-chip .chip-name{font-size:.8rem;font-weight:600;color:var(--fg);line-height:1.2}
+.brand-chip .chip-hex{font-family:var(--mono);font-size:.68rem;color:var(--fg3)}
+.brand-chip .chip-role{font-family:var(--mono);font-size:.62rem;font-weight:600;color:var(--accent);padding:2px 6px;border-radius:3px;background:var(--accent-soft);white-space:nowrap;display:none}
+.brand-chip.on .chip-role{display:inline-block}
+
+.opt-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.opt-row:last-child{margin-bottom:0}
+.opt-row label{font-size:.82rem;color:var(--fg2);font-weight:500}
+
+.toggle{position:relative;width:40px;height:22px;cursor:pointer}
+.toggle input{display:none}
+.toggle .track{position:absolute;inset:0;background:var(--bg3);border-radius:11px;transition:background .2s}
+.toggle input:checked+.track{background:var(--accent)}
+.toggle .thumb{position:absolute;top:2px;left:2px;width:18px;height:18px;background:var(--card);border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.toggle input:checked~.thumb{transform:translateX(18px)}
+
+.num-input{display:flex;align-items:center;gap:0;border:1px solid var(--card-border);border-radius:var(--r-sm);overflow:hidden}
+.num-input button{width:28px;height:28px;border:none;background:var(--bg);cursor:pointer;font-size:.9rem;font-weight:600;color:var(--fg2);transition:background .15s;display:flex;align-items:center;justify-content:center}
+.num-input button:hover{background:var(--bg2)}
+.num-input .num-val{width:36px;text-align:center;font-family:var(--mono);font-size:.82rem;font-weight:500;border:none;background:var(--card);color:var(--fg);padding:4px 0}
+
+.border-color-row{display:flex;align-items:center;gap:8px;margin-top:6px}
+.border-color-row label{font-size:.82rem;color:var(--fg2);min-width:52px;font-weight:500}
+
+.actions{margin-top:auto;padding-top:16px;display:flex;flex-direction:column;gap:8px}
+.btn{font-family:var(--font);font-weight:600;font-size:.88rem;padding:11px 16px;border-radius:var(--r-md);cursor:pointer;transition:all .15s;text-align:center;border:none}
+.btn-primary{background:var(--fg);color:var(--bg)}
+.btn-primary:hover{opacity:.85}
+.btn-secondary{background:transparent;color:var(--fg);border:1.5px solid var(--card-border)}
+.btn-secondary:hover{border-color:var(--fg3)}
+.btn-danger{background:transparent;color:var(--accent);border:1.5px solid rgba(211,82,51,.2)}
+.btn-danger:hover{background:var(--accent-soft)}
+
+.gallery{padding:24px;overflow-y:auto;background:var(--bg)}
+.gallery-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.gallery-count{font-size:.82rem;color:var(--fg3);font-weight:500}
+.btn-select-all{font-family:var(--font);font-size:.78rem;font-weight:600;padding:5px 14px;border-radius:var(--r-sm);cursor:pointer;border:1.5px solid var(--card-border);background:var(--card);color:var(--fg2);transition:all .15s}
+.btn-select-all:hover{border-color:var(--fg3);color:var(--fg)}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px}
+
+.card{background:var(--card);border-radius:var(--r-md);border:1px solid var(--card-border);overflow:hidden;cursor:pointer;transition:all .2s;position:relative}
+.card:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(26,23,20,.08)}
+.card.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.card canvas{width:100%;display:block;aspect-ratio:1}
+.card-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-top:1px solid var(--card-border)}
+.card-id{font-family:var(--mono);font-size:.68rem;color:var(--fg3)}
+.card-dl{width:24px;height:24px;border:none;background:none;cursor:pointer;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;transition:background .15s;color:var(--fg3)}
+.card-dl:hover{background:var(--bg);color:var(--fg)}
+.card-dl svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.card-check{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--accent);display:none;align-items:center;justify-content:center}
+.card.selected .card-check{display:flex}
+.card-check svg{width:12px;height:12px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--fg3);text-align:center;grid-column:1/-1}
+.empty-ico{width:64px;height:64px;margin-bottom:16px;opacity:.3}
+.empty-t{font-weight:600;font-size:1rem;margin-bottom:6px;color:var(--fg2)}
+.empty-d{font-size:.85rem;line-height:1.5}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);padding:10px 20px;border-radius:var(--r-md);background:var(--fg);color:var(--bg);font-size:.82rem;font-weight:500;z-index:100;transition:transform .3s cubic-bezier(.16,1,.3,1);pointer-events:none;white-space:nowrap}
+.toast.on{transform:translateX(-50%) translateY(0)}
+
+@media(max-width:900px){
+  .gallery-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+  .sidebar{padding:16px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="topbar-title"><span></span>Pixel Avatar Generator</div>
+    <a href="index.html" class="topbar-link">返回 Doodlify</a>
+  </div>
+
+  <div class="sidebar">
+    <div class="sec">
+      <div class="sec-label">品牌色（点击选择，至少选 1 个）</div>
+      <div class="brand-colors" id="brand-colors"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">背景 / 边框</div>
+      <div class="color-row">
+        <label>背景色</label>
+        <div class="color-input-wrap">
+          <div class="color-swatch" id="sw-bg"><input type="color" id="clr-bg" value="#D9D9D9"></div>
+          <input type="text" class="color-hex" id="hex-bg" value="#D9D9D9" maxlength="7">
+        </div>
+      </div>
+      <div class="color-row">
+        <label>边框色</label>
+        <div class="color-input-wrap">
+          <div class="color-swatch" id="sw-border"><input type="color" id="clr-border" value="#D9D9D9"></div>
+          <input type="text" class="color-hex" id="hex-border" value="#D9D9D9" maxlength="7">
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">生成选项</div>
+      <div class="opt-row">
+        <label>水平对称</label>
+        <label class="toggle"><input type="checkbox" id="opt-sym" checked><div class="track"></div><div class="thumb"></div></label>
+      </div>
+      <div class="opt-row">
+        <label>每次生成数量</label>
+        <div class="num-input">
+          <button id="num-dec">−</button>
+          <input type="text" class="num-val" id="num-val" value="12" readonly>
+          <button id="num-inc">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="btn-gen">生成像素头像</button>
+      <button class="btn btn-secondary" id="btn-dl-all">批量下载选中</button>
+      <button class="btn btn-danger" id="btn-clear">清空画廊</button>
+    </div>
+  </div>
+
+  <div class="gallery">
+    <div class="gallery-header">
+      <div class="gallery-count" id="g-count">共 0 张</div>
+      <button class="btn-select-all" id="btn-sel-all">全选</button>
+    </div>
+    <div class="gallery-grid" id="g-grid">
+      <div class="empty" id="empty-state">
+        <svg class="empty-ico" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="8" y="8" width="48" height="48" rx="4"/>
+          <rect x="18" y="18" width="10" height="10"/><rect x="36" y="18" width="10" height="10"/>
+          <rect x="18" y="36" width="10" height="10"/><rect x="36" y="36" width="10" height="10"/>
+          <rect x="27" y="27" width="10" height="10"/>
+        </svg>
+        <div class="empty-t">还没有生成任何图片</div>
+        <div class="empty-d">调整左侧参数，点击「生成像素头像」开始</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BRAND_COLORS = [
+  { name: 'Brand Green',    hex: '#DCFDA4' },
+  { name: 'Brand Pink',     hex: '#F4BEF7' },
+  { name: 'Brand Yellow',   hex: '#FDF0A4' },
+  { name: 'Brand Sky Blue', hex: '#598DA8' },
+];
+
+const SIZE = 420;
+const GRID = 5;
+const CELL = 70;
+const BORDER = 35;
+
+let state = {
+  activeColors: [true, false, false, false],
+  bg:     '#D9D9D9',
+  border: '#D9D9D9',
+  sym:    true,
+  count:  12,
+  items:  [],
+  selected: new Set(),
+  idCounter: 0,
+};
+
+const $  = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+let _toast;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(_toast);
+  _toast = setTimeout(() => t.classList.remove('on'), 2200);
+}
+
+function syncColor(prefix, value) {
+  $(`#clr-${prefix}`).value = value;
+  $(`#hex-${prefix}`).value = value.toUpperCase();
+  $(`#sw-${prefix}`).style.background = value;
+}
+
+function initColorPicker(prefix, stateKey) {
+  const clr = $(`#clr-${prefix}`);
+  const hex = $(`#hex-${prefix}`);
+  syncColor(prefix, state[stateKey]);
+
+  clr.addEventListener('input', () => {
+    state[stateKey] = clr.value;
+    syncColor(prefix, clr.value);
+  });
+  hex.addEventListener('change', () => {
+    let v = hex.value.trim();
+    if (!v.startsWith('#')) v = '#' + v;
+    if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
+      state[stateKey] = v;
+      syncColor(prefix, v);
+    } else {
+      syncColor(prefix, state[stateKey]);
+    }
+  });
+}
+
+function getSelectedColors() {
+  return BRAND_COLORS.filter((_, i) => state.activeColors[i]).map(c => c.hex);
+}
+
+function buildBrandColors() {
+  const wrap = $('#brand-colors');
+  wrap.innerHTML = '';
+  BRAND_COLORS.forEach((c, idx) => {
+    const chip = document.createElement('div');
+    chip.className = 'brand-chip' + (state.activeColors[idx] ? ' on' : '');
+    chip.innerHTML = `
+      <div class="chip-dot" style="background:${c.hex}"></div>
+      <div class="chip-info">
+        <div class="chip-name">${c.name}</div>
+        <div class="chip-hex">${c.hex}</div>
+      </div>
+      <div class="chip-role">已选</div>`;
+    chip.addEventListener('click', () => {
+      const willOff = state.activeColors[idx];
+      const onCount = state.activeColors.filter(Boolean).length;
+      if (willOff && onCount <= 1) {
+        toast('至少保留一个颜色');
+        return;
+      }
+      state.activeColors[idx] = !state.activeColors[idx];
+      chip.classList.toggle('on', state.activeColors[idx]);
+    });
+    wrap.appendChild(chip);
+  });
+}
+
+function generateMatrix() {
+  const colors = getSelectedColors();
+  const matrix = Array.from({ length: GRID }, () => Array(GRID).fill(null));
+
+  function randColor() {
+    if (Math.random() < 0.45) return null;
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+
+  if (state.sym) {
+    const halfCols = Math.ceil(GRID / 2);
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < halfCols; c++) {
+        const v = randColor();
+        matrix[r][c] = v;
+        matrix[r][GRID - 1 - c] = v;
+      }
+    }
+  } else {
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        matrix[r][c] = randColor();
+      }
+    }
+  }
+  return matrix;
+}
+
+function renderToCanvas(canvas, matrix, bg, border) {
+  canvas.width = SIZE;
+  canvas.height = SIZE;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = border;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  for (let r = 0; r < GRID; r++) {
+    for (let c = 0; c < GRID; c++) {
+      const x = BORDER + c * CELL;
+      const y = BORDER + r * CELL;
+      ctx.fillStyle = matrix[r][c] || bg;
+      ctx.fillRect(x, y, CELL, CELL);
+    }
+  }
+}
+
+function createCard(item) {
+  const card = document.createElement('div');
+  card.className = 'card' + (state.selected.has(item.id) ? ' selected' : '');
+  card.dataset.id = item.id;
+
+  const canvas = document.createElement('canvas');
+  renderToCanvas(canvas, item.matrix, item.bg, item.border);
+  card.appendChild(canvas);
+
+  const check = document.createElement('div');
+  check.className = 'card-check';
+  check.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+  card.appendChild(check);
+
+  const bar = document.createElement('div');
+  bar.className = 'card-bar';
+  const idEl = document.createElement('span');
+  idEl.className = 'card-id';
+  idEl.textContent = '#' + String(item.id).padStart(4, '0');
+  bar.appendChild(idEl);
+
+  const dl = document.createElement('button');
+  dl.className = 'card-dl';
+  dl.title = '下载';
+  dl.innerHTML = '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+  dl.addEventListener('click', e => {
+    e.stopPropagation();
+    downloadOne(canvas, item.id);
+  });
+  bar.appendChild(dl);
+  card.appendChild(bar);
+
+  card.addEventListener('click', () => {
+    if (state.selected.has(item.id)) {
+      state.selected.delete(item.id);
+      card.classList.remove('selected');
+    } else {
+      state.selected.add(item.id);
+      card.classList.add('selected');
+    }
+    updateCount();
+  });
+
+  return card;
+}
+
+function triggerDownload(href, filename) {
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = href;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => a.remove(), 100);
+}
+
+function downloadOne(canvas, id) {
+  const name = `pixel-${String(id).padStart(4, '0')}.png`;
+  triggerDownload(canvas.toDataURL('image/png'), name);
+  toast('已保存 #' + String(id).padStart(4, '0'));
+}
+
+function updateCount() {
+  const sel = state.selected.size;
+  const total = state.items.length;
+  $('#g-count').textContent = sel > 0
+    ? `共 ${total} 张，已选 ${sel} 张`
+    : `共 ${total} 张`;
+  const btn = $('#btn-sel-all');
+  if (btn) {
+    btn.textContent = (total > 0 && sel === total) ? '取消全选' : '全选';
+  }
+}
+
+function generate() {
+  const grid = $('#g-grid');
+  const empty = $('#empty-state');
+  if (empty) empty.remove();
+
+  const fragment = document.createDocumentFragment();
+  for (let i = 0; i < state.count; i++) {
+    const matrix = generateMatrix();
+    const id = ++state.idCounter;
+    const item = { id, matrix, bg: state.bg, border: state.border };
+    state.items.push(item);
+    fragment.appendChild(createCard(item));
+  }
+  grid.prepend(fragment);
+  updateCount();
+  toast(`已生成 ${state.count} 张像素头像`);
+}
+
+function clearGallery() {
+  state.items = [];
+  state.selected.clear();
+  state.idCounter = 0;
+  const grid = $('#g-grid');
+  grid.innerHTML = `
+    <div class="empty" id="empty-state">
+      <svg class="empty-ico" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="8" y="8" width="48" height="48" rx="4"/>
+        <rect x="18" y="18" width="10" height="10"/><rect x="36" y="18" width="10" height="10"/>
+        <rect x="18" y="36" width="10" height="10"/><rect x="36" y="36" width="10" height="10"/>
+        <rect x="27" y="27" width="10" height="10"/>
+      </svg>
+      <div class="empty-t">还没有生成任何图片</div>
+      <div class="empty-d">调整左侧参数，点击「生成像素头像」开始</div>
+    </div>`;
+  updateCount();
+}
+
+function canvasToBlob(canvas) {
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
+async function downloadSelected() {
+  if (state.selected.size === 0) {
+    toast('请先点击图片选中要下载的');
+    return;
+  }
+  const cards = Array.from($$('.card.selected'));
+
+  if (cards.length === 1) {
+    const canvas = cards[0].querySelector('canvas');
+    const id = cards[0].dataset.id;
+    triggerDownload(canvas.toDataURL('image/png'), `pixel-${String(id).padStart(4, '0')}.png`);
+    toast('已下载 1 张图片');
+    return;
+  }
+
+  toast(`正在打包 ${cards.length} 张图片...`);
+  const zip = new JSZip();
+  for (const card of cards) {
+    const canvas = card.querySelector('canvas');
+    const id = card.dataset.id;
+    const blob = await canvasToBlob(canvas);
+    zip.file(`pixel-${String(id).padStart(4, '0')}.png`, blob);
+  }
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(zipBlob);
+  triggerDownload(url, `pixel-avatars-${Date.now()}.zip`);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast(`已下载 ${cards.length} 张图片（ZIP）`);
+}
+
+function toggleSelectAll() {
+  const allSelected = state.items.length > 0 && state.selected.size === state.items.length;
+  if (allSelected) {
+    state.selected.clear();
+    $$('.card').forEach(c => c.classList.remove('selected'));
+    $('#btn-sel-all').textContent = '全选';
+  } else {
+    state.items.forEach(item => state.selected.add(item.id));
+    $$('.card').forEach(c => c.classList.add('selected'));
+    $('#btn-sel-all').textContent = '取消全选';
+  }
+  updateCount();
+}
+
+function initControls() {
+  buildBrandColors();
+  initColorPicker('bg', 'bg');
+  initColorPicker('border', 'border');
+
+  $('#opt-sym').checked = state.sym;
+  $('#opt-sym').addEventListener('change', e => state.sym = e.target.checked);
+
+  $('#num-val').value = state.count;
+  $('#num-dec').addEventListener('click', () => {
+    state.count = Math.max(1, state.count - 1);
+    $('#num-val').value = state.count;
+  });
+  $('#num-inc').addEventListener('click', () => {
+    state.count = Math.min(100, state.count + 1);
+    $('#num-val').value = state.count;
+  });
+
+  $('#btn-gen').addEventListener('click', generate);
+  $('#btn-dl-all').addEventListener('click', downloadSelected);
+  $('#btn-clear').addEventListener('click', clearGallery);
+  $('#btn-sel-all').addEventListener('click', toggleSelectAll);
+}
+
+document.addEventListener('DOMContentLoaded', initControls);
+</script>
+</body>
+</html>
