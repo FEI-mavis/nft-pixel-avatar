@@ -246,6 +246,7 @@ function initColorPicker(prefix, stateKey) {
   clr.addEventListener('input', () => {
     state[stateKey] = clr.value;
     syncColor(prefix, clr.value);
+    repaintAll();
   });
   hex.addEventListener('change', () => {
     let v = hex.value.trim();
@@ -253,6 +254,7 @@ function initColorPicker(prefix, stateKey) {
     if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
       state[stateKey] = v;
       syncColor(prefix, v);
+      repaintAll();
     } else {
       syncColor(prefix, state[stateKey]);
     }
@@ -291,19 +293,20 @@ function buildBrandColors() {
 }
 
 function generateMatrix() {
-  const colors = getSelectedColors();
-  const matrix = Array.from({ length: GRID }, () => Array(GRID).fill(null));
+  const activeIndices = [];
+  state.activeColors.forEach((on, i) => { if (on) activeIndices.push(i); });
+  const matrix = Array.from({ length: GRID }, () => Array(GRID).fill(-1));
 
-  function randColor() {
-    if (Math.random() < 0.45) return null;
-    return colors[Math.floor(Math.random() * colors.length)];
+  function randIdx() {
+    if (Math.random() < 0.45) return -1;
+    return activeIndices[Math.floor(Math.random() * activeIndices.length)];
   }
 
   if (state.sym) {
     const halfCols = Math.ceil(GRID / 2);
     for (let r = 0; r < GRID; r++) {
       for (let c = 0; c < halfCols; c++) {
-        const v = randColor();
+        const v = randIdx();
         matrix[r][c] = v;
         matrix[r][GRID - 1 - c] = v;
       }
@@ -311,29 +314,41 @@ function generateMatrix() {
   } else {
     for (let r = 0; r < GRID; r++) {
       for (let c = 0; c < GRID; c++) {
-        matrix[r][c] = randColor();
+        matrix[r][c] = randIdx();
       }
     }
   }
   return matrix;
 }
 
-function renderToCanvas(canvas, matrix, bg, border) {
+function renderToCanvas(canvas, matrix) {
   canvas.width = SIZE;
   canvas.height = SIZE;
   const ctx = canvas.getContext('2d');
 
-  ctx.fillStyle = border;
+  ctx.fillStyle = state.border;
   ctx.fillRect(0, 0, SIZE, SIZE);
 
   for (let r = 0; r < GRID; r++) {
     for (let c = 0; c < GRID; c++) {
       const x = BORDER + c * CELL;
       const y = BORDER + r * CELL;
-      ctx.fillStyle = matrix[r][c] || bg;
+      const idx = matrix[r][c];
+      ctx.fillStyle = (idx >= 0 && BRAND_COLORS[idx]) ? BRAND_COLORS[idx].hex : state.bg;
       ctx.fillRect(x, y, CELL, CELL);
     }
   }
+}
+
+function repaintAll() {
+  const cards = $$('.card');
+  cards.forEach(card => {
+    const id = parseInt(card.dataset.id);
+    const item = state.items.find(it => it.id === id);
+    if (!item) return;
+    const canvas = card.querySelector('canvas');
+    renderToCanvas(canvas, item.matrix);
+  });
 }
 
 function createCard(item) {
@@ -342,7 +357,7 @@ function createCard(item) {
   card.dataset.id = item.id;
 
   const canvas = document.createElement('canvas');
-  renderToCanvas(canvas, item.matrix, item.bg, item.border);
+  renderToCanvas(canvas, item.matrix);
   card.appendChild(canvas);
 
   const check = document.createElement('div');
@@ -419,7 +434,7 @@ function generate() {
   for (let i = 0; i < state.count; i++) {
     const matrix = generateMatrix();
     const id = ++state.idCounter;
-    const item = { id, matrix, bg: state.bg, border: state.border };
+    const item = { id, matrix };
     state.items.push(item);
     fragment.appendChild(createCard(item));
   }
